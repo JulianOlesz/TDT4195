@@ -67,32 +67,48 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
     // * Fill it with data
     // * Return the ID of the VAO
 
-    let mut vao: [u32; 1] = [0];
-    let mut vbo: [u32; 1] = [0];
-    let mut indexBuffer;
+    // Vertex Array Object
+    let mut vao: u32 = 0; 
 
-    //60% AI, how do i know what type it wants? And how do I convert to it? 
+    // Vertex Buffer Object
+    let mut vbo: u32 = 0;
+
+    // Index/Element Buffer Object 
+    let mut index_buffer: u32 = 0;
+
     unsafe {
-        gl::GenVertexArrays(1, &mut vao[0] as *mut u32);
+        gl::GenVertexArrays(1, &mut vao as *mut u32);
 
-        gl::BindVertexArray(vao[0]);
+        gl::BindVertexArray(vao);
 
-        gl::GenBuffers(1, &mut vbo[0] as *mut u32);
+        gl::GenBuffers(1, &mut vbo as *mut u32);
 
-        gl::BindBuffer(gl::ARRAY_BUFFER, vbo[0]);
+        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
 
-        gl::BufferData(gl::ARRAY_BUFFER, (vertices.len() * std::mem::size_of_val(&vertices[0])) as isize, vertices.as_ptr() as *const c_void, gl::STATIC_DRAW);
+        gl::BufferData(
+            gl::ARRAY_BUFFER, 
+            byte_size_of_array(vertices), 
+            pointer_to_array(vertices),
+            gl::STATIC_DRAW
+        );
     
-        gl::VertexAttribPointer(0, 1, gl::GL_FLOAT, gl::GL_FALSE, 0, 0);
+        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
 
         gl::EnableVertexAttribArray(0);
 
-        gl::GenBuffers()
-    
+        gl::GenBuffers(1, &mut index_buffer);
+
+        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
+
+        gl::BufferData(
+            gl::ELEMENT_ARRAY_BUFFER,
+            byte_size_of_array(vertices),
+            pointer_to_array(vertices),
+            gl::STATIC_DRAW
+        );
     }
 
-
-    vao[0]
+    vao
 }
 
 
@@ -156,17 +172,23 @@ fn main() {
         }
 
         // == // Set up your VAO around here
-        let vect1 = glm::vec3::<i32>(1.0, 2.0, 3.0);
-        let vgrd1 = glm::vec3::<u32>(1, 2, 3);
+        let vertices: Vec<f32> = vec![
+            1.0, 2.0, 3.0,
+        ];
 
-        let my_vao = unsafe { create_vao(&vect1, &vgrd1) };
+        let indices: Vec<u32> = vec![
+            0, 1, 2,
+            2, 3, 0,
+        ];
+
+        let my_vao = unsafe { create_vao(&vertices, &indices) };
 
 
         // == // Set up your shaders here
 
-           let shaderval = 0; 
+        let shaderval = 0; 
 
-    //let shBuilder = shader::compile_shader(std::ptr::null(), "./shaders/simple.frag", gl::FRAGMENT_SHADER);
+        //let shBuilder = shader::compile_shader(std::ptr::null(), "./shaders/simple.frag", gl::FRAGMENT_SHADER);
     
         let simple_shader = unsafe {
             shader::ShaderBuilder::new()
