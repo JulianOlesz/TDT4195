@@ -77,11 +77,11 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
     let mut index_buffer: u32 = 0;
 
     unsafe {
-        gl::GenVertexArrays(1, &mut vao as *mut u32);
+        gl::GenVertexArrays(1, &mut vao);
 
         gl::BindVertexArray(vao);
 
-        gl::GenBuffers(1, &mut vbo as *mut u32);
+        gl::GenBuffers(1, &mut vbo);
 
         gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
 
@@ -102,8 +102,8 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
 
         gl::BufferData(
             gl::ELEMENT_ARRAY_BUFFER,
-            byte_size_of_array(vertices),
-            pointer_to_array(vertices),
+            byte_size_of_array(indices),
+            pointer_to_array(indices),
             gl::STATIC_DRAW
         );
     }
@@ -171,14 +171,15 @@ fn main() {
             println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
         }
 
-        // == // Set up your VAO around here
+        
         let vertices: Vec<f32> = vec![
-            1.0, 2.0, 3.0,
+            -0.6, -0.6, 0.0,
+            0.6, -0.6, 0.0,
+            0.0,  0.6, 0.0,
         ];
 
         let indices: Vec<u32> = vec![
             0, 1, 2,
-            2, 3, 0,
         ];
 
         let my_vao = unsafe { create_vao(&vertices, &indices) };
@@ -186,12 +187,9 @@ fn main() {
 
         // == // Set up your shaders here
 
-        let shaderval = 0; 
-
-        //let shBuilder = shader::compile_shader(std::ptr::null(), "./shaders/simple.frag", gl::FRAGMENT_SHADER);
-    
         let simple_shader = unsafe {
             shader::ShaderBuilder::new()
+                .attach_file("./shaders/simple.vert")
                 .attach_file("./shaders/simple.frag")
                 .link()
         };
@@ -276,6 +274,10 @@ fn main() {
 
 
                 // == // Issue the necessary gl:: commands to draw your scene here
+
+                simple_shader.activate();
+                gl::BindVertexArray(my_vao);
+                gl::DrawElements(gl::TRIANGLES, indices.len() as i32, gl::UNSIGNED_INT, std::ptr::null());
 
 
 
