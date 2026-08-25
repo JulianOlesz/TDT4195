@@ -174,9 +174,9 @@ fn main() {
         
         let vertices: Vec<f32> = vec![
             // T1
-            0.6, -0.8, -1.2,
+            0.6, -0.8, -1.0,
             0.0, 0.4, 0.0,
-            -0.8, -0.2, 1.2,
+            -0.8, -0.2, 1.0,
 
             /*
             // T2
@@ -220,7 +220,7 @@ fn main() {
         let simple_shader = unsafe {
             shader::ShaderBuilder::new()
                 .attach_file("./shaders/simple.vert")
-                .attach_file("./shaders/simple.frag")
+                .attach_file("./shaders/checkers.frag")
                 .link()
         };
 
