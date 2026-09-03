@@ -8,14 +8,20 @@
 #![allow(unused_variables)]
 */
 extern crate nalgebra_glm as glm;
-use std::{ mem, ptr, os::raw::c_void };
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
-use std::sync::{Mutex, Arc, RwLock};
+use std::{mem, os::raw::c_void, ptr};
 
 mod shader;
 mod util;
 
-use glutin::event::{Event, WindowEvent, DeviceEvent, KeyboardInput, ElementState::{Pressed, Released}, VirtualKeyCode::{self, *}};
+use glutin::event::{
+    DeviceEvent,
+    ElementState::{Pressed, Released},
+    Event, KeyboardInput,
+    VirtualKeyCode::{self, *},
+    WindowEvent,
+};
 use glutin::event_loop::ControlFlow;
 
 // initial window size
@@ -48,69 +54,109 @@ fn offset<T>(n: u32) -> *const c_void {
     (n * mem::size_of::<T>() as u32) as *const T as *const c_void
 }
 
-// Get a null pointer (equivalent to an offset of 0)
-// ptr::null()
+fn create_circle(radius: f32, segments: u32, aspect_ratio: f32) -> (Vec<f32>, Vec<u32>) {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
 
+    vertices.extend_from_slice(&[0.0, 0.0, 0.0]);
 
-// == // Generate your VAO here
-unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
-    // Implement me!
-
-    // Also, feel free to delete comments :)
-
-    // This should:
-    // * Generate a VAO and bind it
-    // * Generate a VBO and bind it
-    // * Fill it with data
-    // * Configure a VAP for the data and enable it
-    // * Generate a IBO and bind it
-    // * Fill it with data
-    // * Return the ID of the VAO
-
-    // Vertex Array Object
-    let mut vao: u32 = 0; 
-
-    // Vertex Buffer Object
-    let mut vbo: u32 = 0;
-
-    // Index/Element Buffer Object 
-    let mut index_buffer: u32 = 0;
-
-    unsafe {
-        gl::GenVertexArrays(1, &mut vao);
-
-        gl::BindVertexArray(vao);
-
-        gl::GenBuffers(1, &mut vbo);
-
-        gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
-
-        gl::BufferData(
-            gl::ARRAY_BUFFER, 
-            byte_size_of_array(vertices), 
-            pointer_to_array(vertices),
-            gl::STATIC_DRAW
-        );
-    
-        gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
-
-        gl::EnableVertexAttribArray(0);
-
-        gl::GenBuffers(1, &mut index_buffer);
-
-        gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
-
-        gl::BufferData(
-            gl::ELEMENT_ARRAY_BUFFER,
-            byte_size_of_array(indices),
-            pointer_to_array(indices),
-            gl::STATIC_DRAW
-        );
+    for i in 0..segments {
+        let angle = (i as f32 / segments as f32) * 2.0 * std::f32::consts::PI;
+        
+        let x = (radius * angle.cos()) / aspect_ratio;
+        let y = radius * angle.sin();
+        vertices.extend_from_slice(&[x, y, 0.0]);
     }
+
+    for i in 1..=segments {
+        let next = if i == segments { 1 } else { i + 1 };
+        indices.extend_from_slice(&[0, i, next]);
+    }
+
+    (vertices, indices)
+}
+
+fn create_spiral(max_radius: f32, turns: f32, segments: u32, aspect_ratio: f32) -> Vec<f32> {
+    let mut vertices = Vec::new();
+    let total_angle = turns * 2.0 * std::f32::consts::PI;
+
+    for i in 0..=segments {
+        let progress = i as f32 / segments as f32;
+        let angle = progress * total_angle;
+        let radius = progress * max_radius;
+
+        let x = (radius * angle.cos()) / aspect_ratio;
+        let y = radius * angle.sin();
+        let z = 0.0;
+
+        vertices.extend_from_slice(&[x, y, z]);
+    }
+
+    vertices
+}
+
+unsafe fn create_line_vao(vertices: &Vec<f32>) -> u32 {
+    let mut vao = 0;
+    let mut vbo = 0;
+
+    gl::GenVertexArrays(1, &mut vao);
+    gl::BindVertexArray(vao);
+
+    gl::GenBuffers(1, &mut vbo);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+    gl::BufferData(
+        gl::ARRAY_BUFFER,
+        byte_size_of_array(vertices),
+        pointer_to_array(vertices),
+        gl::STATIC_DRAW,
+    );
+
+    let stride = (3 * std::mem::size_of::<f32>()) as i32;
+    gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, stride, std::ptr::null());
+    gl::EnableVertexAttribArray(0);
 
     vao
 }
 
+// Get a null pointer (equivalent to an offset of 0)
+// ptr::null()
+
+// == // Generate your VAO here
+unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>) -> u32 {
+    let mut vao: u32 = 0;
+    let mut vbo: u32 = 0;
+    let mut index_buffer: u32 = 0;
+
+    // 1. Generate and bind the VAO
+    gl::GenVertexArrays(1, &mut vao);
+    gl::BindVertexArray(vao);
+
+    // 2. Generate VBO and upload vertex positions
+    gl::GenBuffers(1, &mut vbo);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+    gl::BufferData(
+        gl::ARRAY_BUFFER,
+        byte_size_of_array(vertices),
+        pointer_to_array(vertices),
+        gl::STATIC_DRAW,
+    );
+
+    // 3. Configure attribute layout 0 (3 floats per vertex, 0 stride)
+    gl::VertexAttribPointer(0, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+    gl::EnableVertexAttribArray(0);
+
+    // 4. Generate IBO (Index Buffer) and upload index data
+    gl::GenBuffers(1, &mut index_buffer);
+    gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
+    gl::BufferData(
+        gl::ELEMENT_ARRAY_BUFFER,
+        byte_size_of_array(indices),
+        pointer_to_array(indices),
+        gl::STATIC_DRAW,
+    );
+
+    vao
+}
 
 fn main() {
     // Set up the necessary objects to deal with windows and event handling
@@ -118,9 +164,11 @@ fn main() {
     let wb = glutin::window::WindowBuilder::new()
         .with_title("Gloom-rs")
         .with_resizable(true)
-        .with_inner_size(glutin::dpi::LogicalSize::new(INITIAL_SCREEN_W, INITIAL_SCREEN_H));
-    let cb = glutin::ContextBuilder::new()
-        .with_vsync(true);
+        .with_inner_size(glutin::dpi::LogicalSize::new(
+            INITIAL_SCREEN_W,
+            INITIAL_SCREEN_H,
+        ));
+    let cb = glutin::ContextBuilder::new().with_vsync(true);
     let windowed_context = cb.build_windowed(wb, &el).unwrap();
     // Uncomment these if you want to use the mouse for controls, but want it to be confined to the screen and/or invisible.
     // windowed_context.window().set_cursor_grab(true).expect("failed to grab cursor");
@@ -166,60 +214,70 @@ fn main() {
             gl::DebugMessageCallback(Some(util::debug_callback), ptr::null());
 
             // Print some diagnostics
-            println!("{}: {}", util::get_gl_string(gl::VENDOR), util::get_gl_string(gl::RENDERER));
+            println!(
+                "{}: {}",
+                util::get_gl_string(gl::VENDOR),
+                util::get_gl_string(gl::RENDERER)
+            );
             println!("OpenGL\t: {}", util::get_gl_string(gl::VERSION));
-            println!("GLSL\t: {}", util::get_gl_string(gl::SHADING_LANGUAGE_VERSION));
+            println!(
+                "GLSL\t: {}",
+                util::get_gl_string(gl::SHADING_LANGUAGE_VERSION)
+            );
         }
 
-        
+        // == // Set up your VAO around here
+
         let vertices: Vec<f32> = vec![
-            // T1
-            -0.5, -0.5, 0.0,
-            0.5, -0.5, 0.0,
-            0.0, 0.5, 0.0,
+            //  X,     Y,    Z
+            // Triangle 1 (Middle)
+            -0.2, -0.1, 0.0,
+            0.2, -0.1, 0.0,
+            0.0, 0.3, 0.0,
 
-            /*
-            // T2
-            -0.2, -0.2, 0.0,
-            0.2, -0.2, 0.0,
-            0.0, 0.2, 0.0,
+            // Triangle 2 (Top-Left)
+            -0.8, 0.4, 0.0,
+            -0.4, 0.4, 0.0,
+            -0.6, 0.8, 0.0,
 
-            // T3
-            -0.9, 0.5, 0.0,
-            -0.4, 0.5, 0.0,
-            -0.8,  0.9, 0.0,
+            // Triangle 3 (Top-Right / Skewed)
+            0.4, 0.4, 0.0,
+            0.7, 0.4, 0.0,
+            0.9, 0.8, 0.0,
 
-            // T4
-            0.5, 0.5, 0.0,
-            0.9, 0.5, 0.0,
-            0.7, 0.9, 0.0,
+            // Triangle 4 (Bottom-Left)
+            -0.8, -0.8, 0.0,
+            -0.4, -0.8, 0.0,
+            -0.6, -0.4, 0.0,
 
-            // T5
-            0.5, -0.9, 0.0,
-            0.9, -0.9, 0.0,
-            0.7, -0.5, 0.0,
-             */
+            // Triangle 5 (Bottom-Right / Skewed)
+            0.4, -0.8, 0.0,
+            0.7, -0.8, 0.0,
+            0.9, -0.4, 0.0,
         ];
 
         let indices: Vec<u32> = vec![
-            0, 1, 2,
-            3, 4, 5,
-            6, 7, 8,
-            9, 10, 11,
-            12, 13, 14,
+            0, 1, 2, // Center
+            3, 4, 5, // Top-Left
+            6, 7, 8, // Top-Right
+            9, 10, 11, // Bottom-Left
+            12, 13, 14, // Bottom-Right
         ];
+
+        // let aspect_ratio = INITIAL_SCREEN_W as f32 / INITIAL_SCREEN_H as f32;
+        // let (vertices, indices) = create_circle(0.5, 64, aspect_ratio);
+
 
         let my_vao = unsafe { create_vao(&vertices, &indices) };
 
+        // let aspect_ratio = INITIAL_SCREEN_W as f32 / INITIAL_SCREEN_H as f32;
+        // Generate spiral with max radius 0.8, 3 full rotations (turns), 300 segments
+        // let spiral_vertices = create_spiral(0.8, 3.0, 300, aspect_ratio);
+        // let num_vertices = (spiral_vertices.len() / 3) as i32;
+        //
+        // let spiral_vao = unsafe { create_line_vao(&spiral_vertices) };
 
         // == // Set up your shaders here
-
-        let simple_shader = unsafe {
-            shader::ShaderBuilder::new()
-                .attach_file("./shaders/simple.vert")
-                .attach_file("./shaders/checkers.frag")
-                .link()
-        };
 
         // Basic usage of shader helper:
         // The example code below creates a 'shader' object.
@@ -228,18 +286,19 @@ fn main() {
         // This snippet is not enough to do the exercise, and will need to be modified (outside
         // of just using the correct path), but it only needs to be called once
 
-        /*
         let simple_shader = unsafe {
             shader::ShaderBuilder::new()
-                .attach_file("./path/to/simple/shader.file")
+                .attach_file("./shaders/simple.vert")
+                .attach_file("./shaders/simple.frag")
                 .link()
         };
-        */
 
+        unsafe {
+            simple_shader.activate();
+        }
 
         // Used to demonstrate keyboard handling for exercise 2.
         let mut _arbitrary_number = 0.0; // feel free to remove
-
 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
@@ -258,7 +317,9 @@ fn main() {
                     window_aspect_ratio = new_size.0 as f32 / new_size.1 as f32;
                     (*new_size).2 = false;
                     println!("Window was resized to {}x{}", new_size.0, new_size.1);
-                    unsafe { gl::Viewport(0, 0, new_size.0 as i32, new_size.1 as i32); }
+                    unsafe {
+                        gl::Viewport(0, 0, new_size.0 as i32, new_size.1 as i32);
+                    }
                 }
             }
 
@@ -268,7 +329,6 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
-
                         VirtualKeyCode::A => {
                             _arbitrary_number += delta_time;
                         }
@@ -276,15 +336,13 @@ fn main() {
                             _arbitrary_number -= delta_time;
                         }
 
-
                         // default handler:
-                        _ => { }
+                        _ => {}
                     }
                 }
             }
             // Handle mouse movement. delta contains the x and y movement of the mouse since last frame in pixels
             if let Ok(mut delta) = mouse_delta.lock() {
-
                 // == // Optionally access the accumulated mouse movement between
                 // == // frames here with `delta.0` and `delta.1`
 
@@ -293,21 +351,23 @@ fn main() {
 
             // == // Please compute camera transforms here (exercise 2 & 3)
 
-
             unsafe {
                 // Clear the color and depth buffers
                 gl::ClearColor(0.035, 0.046, 0.078, 1.0); // night sky
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
+                let c_str = std::ffi::CString::new("time").unwrap();
+                let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
+                gl::Uniform1f(location, elapsed);
 
-                // == // Issue the necessary gl:: commands to draw your scene here
-
-                simple_shader.activate();
+                // 4. Draw the circle VAO
                 gl::BindVertexArray(my_vao);
-                gl::DrawElements(gl::TRIANGLES, indices.len() as i32, gl::UNSIGNED_INT, std::ptr::null());
-
-
-
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    indices.len() as i32,
+                    gl::UNSIGNED_INT,
+                    std::ptr::null(),
+                );
             }
 
             // Display the new color buffer on the display
@@ -315,11 +375,9 @@ fn main() {
         }
     });
 
-
     // == //
     // == // From here on down there are only internals.
     // == //
-
 
     // Keep track of the health of the rendering thread
     let render_thread_healthy = Arc::new(RwLock::new(true));
@@ -345,19 +403,38 @@ fn main() {
         }
 
         match event {
-            Event::WindowEvent { event: WindowEvent::Resized(physical_size), .. } => {
-                println!("New window size received: {}x{}", physical_size.width, physical_size.height);
+            Event::WindowEvent {
+                event: WindowEvent::Resized(physical_size),
+                ..
+            } => {
+                println!(
+                    "New window size received: {}x{}",
+                    physical_size.width, physical_size.height
+                );
                 if let Ok(mut new_size) = arc_window_size.lock() {
                     *new_size = (physical_size.width, physical_size.height, true);
                 }
             }
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
                 *control_flow = ControlFlow::Exit;
             }
             // Keep track of currently pressed keys to send to the rendering thread
-            Event::WindowEvent { event: WindowEvent::KeyboardInput {
-                    input: KeyboardInput { state: key_state, virtual_keycode: Some(keycode), .. }, .. }, .. } => {
-
+            Event::WindowEvent {
+                event:
+                WindowEvent::KeyboardInput {
+                    input:
+                    KeyboardInput {
+                        state: key_state,
+                        virtual_keycode: Some(keycode),
+                        ..
+                    },
+                    ..
+                },
+                ..
+            } => {
                 if let Ok(mut keys) = arc_pressed_keys.lock() {
                     match key_state {
                         Released => {
@@ -365,7 +442,7 @@ fn main() {
                                 let i = keys.iter().position(|&k| k == keycode).unwrap();
                                 keys.remove(i);
                             }
-                        },
+                        }
                         Pressed => {
                             if !keys.contains(&keycode) {
                                 keys.push(keycode);
@@ -376,18 +453,25 @@ fn main() {
 
                 // Handle Escape and Q keys separately
                 match keycode {
-                    Escape => { *control_flow = ControlFlow::Exit; }
-                    Q      => { *control_flow = ControlFlow::Exit; }
-                    _      => { }
+                    Escape => {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    Q => {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                    _ => {}
                 }
             }
-            Event::DeviceEvent { event: DeviceEvent::MouseMotion { delta }, .. } => {
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
                 // Accumulate mouse movement
                 if let Ok(mut position) = arc_mouse_delta.lock() {
                     *position = (position.0 + delta.0 as f32, position.1 + delta.1 as f32);
                 }
             }
-            _ => { }
+            _ => {}
         }
     });
 }
