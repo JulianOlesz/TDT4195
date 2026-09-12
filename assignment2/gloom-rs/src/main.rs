@@ -183,65 +183,45 @@ fn main() {
             // Bottom-left vertice
             // Bottom-right vertice
             // Top vertice
-            // Triangle 1 (Middle)
-            -0.2, -0.1, 0.0,
-            0.2, -0.1, 0.0,
-            0.0, 0.3, 0.0,
+            // Triangle 1 (Left)
+            -0.5, -0.5, -0.5,
+            0.3, -0.5, -0.5,
+            -0.1, 0.5, -0.5,
 
-            // Triangle 2 (Top-Left)
-            -0.8, 0.4, 0.0,
-            -0.4, 0.4, 0.0,
-            -0.6, 0.8, 0.0,
+            // Triangle 2 (Middle)
+            -0.3, -0.3, 0.0,
+            0.5, -0.3, 0.0,
+            0.1, 0.7, 0.0,
 
-            // Triangle 3 (Top-Right)
-            0.4, 0.4, 0.0,
-            0.8, 0.4, 0.0,
-            0.6, 0.8, 0.0,
+            // Triangle 3 (Right)
+            -0.1, -0.1, -0.4,
+            0.7, -0.1, -0.4,
+            0.3, 0.9, -0.4,
 
-            // Triangle 4 (Bottom-Left)
-            -0.8, -0.8, 0.0,
-            -0.4, -0.8, 0.0,
-            -0.6, -0.4, 0.0,
-
-            // Triangle 5 (Bottom-Right)
-            0.4, -0.8, 0.0,
-            0.8, -0.8, 0.0,
-            0.6, -0.4, 0.0,
         ];
 
         let indices: Vec<u32> = vec![
             0, 1, 2, // Center
             3, 4, 5, // Top-Left
             6, 7, 8, // Top-Right
-            9, 10, 11, // Bottom-Left
-            12, 13, 14, // Bottom-Right
         ];
 
         let colors: Vec<f32> = vec![
-            // Triangle 1 (Middle) - RGBA
-            1.0, 0.0, 0.0, 1.0,  // Red
-            0.0, 1.0, 0.0, 1.0,  // Green
-            0.0, 0.0, 1.0, 1.0,  // Blue
+            // Triangle 1 (Left) - RGBA
+            // Red, Green, Blue, Alpha
+            1.0, 0.0, 0.0, 0.5,
+            1.0, 0.0, 0.0, 0.5,
+            1.0, 0.0, 0.0, 0.5,
 
-            // Triangle 2 (Top-Left)
-            1.0, 1.0, 0.0, 1.0,
-            0.0, 1.0, 1.0, 1.0,
-            1.0, 0.0, 1.0, 1.0,
+            // Triangle 2 (Middle)
+            0.0, 1.0, 0.0, 0.5,
+            0.0, 1.0, 0.0, 0.5,
+            0.0, 1.0, 0.0, 0.5,
 
-            // Triangle 3 (Top-Right)
-            1.0, 0.5, 0.0, 1.0,
-            0.5, 1.0, 0.0, 1.0,
-            0.0, 0.5, 1.0, 1.0,
-
-            // Triangle 4 (Bottom-Left)
-            0.5, 0.0, 0.5, 1.0,
-            0.0, 0.5, 0.5, 1.0,
-            0.5, 0.5, 0.0, 1.0,
-
-            // Triangle 5 (Bottom-Right)
-            1.0, 1.0, 1.0, 1.0,
-            0.5, 0.5, 0.5, 1.0,
-            0.2, 0.2, 0.2, 1.0,
+            // Triangle 3 (Right)
+            0.0, 0.0, 1.0, 0.5,
+            0.0, 0.0, 1.0, 0.5,
+            0.0, 0.0, 1.0, 0.5,
         ];
 
         let my_vao = unsafe { create_vao(&vertices, &indices, &colors) };
