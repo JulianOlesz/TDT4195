@@ -249,10 +249,30 @@ fn main() {
         // Used to demonstrate keyboard handling for exercise 2.
         let mut _arbitrary_number = 0.0; // feel free to remove
 
+        // Variables for camera 
+        let mut camera_pos = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
+        let mut camera_rot = glm::vec2(0.0, 0.0); // Rotation on x and z
+        let camera_speed: f32 = 3.0; 
+
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
         let mut previous_frame_time = first_frame_time;
 
+        
+        let translation: glm::Mat4 = glm::translation(&glm::vec3(0.0, 0.0, -5.0));
+
+        let projection: glm::Mat4 = 
+            glm::perspective(
+                window_aspect_ratio,
+                20.0_f32.to_radians(),
+                1.0,
+                100.0,
+            );
+
+        let transformation: glm::Mat4 = projection * translation;
+
+        println!("{}", transformation);
+        println!("{}", window_aspect_ratio);
 
         loop {
             
@@ -261,6 +281,7 @@ fn main() {
             let elapsed = now.duration_since(first_frame_time).as_secs_f32();
             let delta_time = now.duration_since(previous_frame_time).as_secs_f32();
             previous_frame_time = now;
+
 
             // Handle resize events
             if let Ok(mut new_size) = window_size.lock() {
@@ -281,11 +302,37 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
+                        VirtualKeyCode::W => {
+                            camera_pos[2] -= camera_speed * delta_time;
+                        }
                         VirtualKeyCode::A => {
-                            _arbitrary_number += delta_time;
+                            camera_pos[0] -= camera_speed * delta_time;
+                        }
+                        VirtualKeyCode::S => {
+                            camera_pos[2] += camera_speed * delta_time;
                         }
                         VirtualKeyCode::D => {
-                            _arbitrary_number -= delta_time;
+                            camera_pos[0] += camera_speed * delta_time;
+                        }
+                        VirtualKeyCode::LShift => {
+                            camera_pos[1] -= camera_speed * delta_time;
+                        }
+                        VirtualKeyCode::Space => {
+                            camera_pos[1] += camera_speed * delta_time;
+                        }
+
+                        // No camera speed multiplier because it was way too quick
+                        VirtualKeyCode::Up => {
+                            camera_rot[0] -= delta_time;
+                        }
+                        VirtualKeyCode::Down => {
+                            camera_rot[0] += delta_time;
+                        }
+                        VirtualKeyCode::Left => {
+                            camera_rot[1] -= delta_time;
+                        }
+                        VirtualKeyCode::Right => {
+                            camera_rot[1] += delta_time;
                         }
 
                         // default handler:
@@ -303,6 +350,15 @@ fn main() {
 
             // == // Please compute camera transforms here (exercise 2 & 3)
 
+            let mut camera_transformation: glm::Mat4 = glm::identity();
+            camera_transformation = glm::rotate(&camera_transformation, camera_rot[0], &glm::vec3(1.0, 0.0, 0.0));
+            camera_transformation = glm::rotate(&camera_transformation, camera_rot[1], &glm::vec3(0.0, 1.0, 0.0));
+            camera_transformation = glm::translate(&camera_transformation, &glm::vec3(-camera_pos[0], -camera_pos[1], -camera_pos[2]));
+
+            let transformation_c = projection * camera_transformation;
+
+            println!("{}", transformation_c);
+
             unsafe {
                 // Clear the color and depth buffers
                 gl::ClearColor(0.035, 0.046, 0.078, 1.0); // night sky
@@ -311,6 +367,18 @@ fn main() {
                 let c_str = std::ffi::CString::new("time").unwrap();
                 let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
                 gl::Uniform1f(location, elapsed);
+
+                // Passes the transformation matrix to the shader
+                let name = std::ffi::CString::new("transformation").unwrap();
+                let location2 = gl::GetUniformLocation(simple_shader.program_id, name.as_ptr());
+                gl::UniformMatrix4fv(
+                    location2,
+                    1,
+                    gl::FALSE,
+                    transformation_c.as_ptr(),
+                );
+
+
 
                 // 4. Draw the circle VAO
                 gl::BindVertexArray(my_vao);
