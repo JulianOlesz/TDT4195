@@ -184,9 +184,9 @@ fn main() {
             // Bottom-right vertice
             // Top vertice
             // Triangle 1 (Left)
-            -0.5, -0.5, -0.5,
-            0.3, -0.5, -0.5,
-            -0.1, 0.5, -0.5,
+            -0.5, -0.5, 0.5,
+            0.3, -0.5, 0.5,
+            -0.1, 0.5, 0.5,
 
             // Triangle 2 (Middle)
             -0.3, -0.3, 0.0,
@@ -194,9 +194,9 @@ fn main() {
             0.1, 0.7, 0.0,
 
             // Triangle 3 (Right)
-            -0.1, -0.1, -0.4,
-            0.7, -0.1, -0.4,
-            0.3, 0.9, -0.4,
+            -0.1, -0.1, -0.5,
+            0.7, -0.1, -0.5,
+            0.3, 0.9, -0.5,
 
         ];
 
@@ -252,7 +252,10 @@ fn main() {
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
         let mut previous_frame_time = first_frame_time;
+
+
         loop {
+            
             // Compute time passed since the previous frame and since the start of the program
             let now = std::time::Instant::now();
             let elapsed = now.duration_since(first_frame_time).as_secs_f32();
