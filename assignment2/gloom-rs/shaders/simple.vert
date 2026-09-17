@@ -1,17 +1,19 @@
 #version 430 core
 
 layout(location = 0) in vec3 position;
+// layout(location = 1) in vec4 color;
 layout(location = 1) in vec4 color;
 
-out vec4 vertexColor;
+out noperspective vec4 vertexColor;
+//out smooth vec4 vertexColor;
 
 uniform float time; 
 uniform mat4 transformation; 
 
 void main() {
-    float loop = sin(time) * 0.5 + 0.5;
-
+    
 /*
+    float loop = sin(time) * 0.5 + 0.5;
     mat4 matrixVariable = mat4(1.0);
 
     // Matrices in opengl are the wrong way, so each index is actually a column

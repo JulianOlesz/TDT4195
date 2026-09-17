@@ -184,19 +184,19 @@ fn main() {
             // Bottom-right vertice
             // Top vertice
             // Triangle 1 (Left)
-            -0.5, -0.5, -2.5,
-            0.3, -0.5, -2.5,
-            -0.1, 0.5, -2.5,
+            -0.5, -0.5, 2.5,
+            0.3, -0.5, 2.5,
+            -0.1, 0.5, 2.5,
 
             // Triangle 2 (Middle)
-            -0.3, -0.3, -2.0,
-            0.5, -0.3, -2.0,
-            0.1, 0.7, -2.0,
+            0.6, 0.6, -5.0,
+            -0.6, 0.6, -50.0,
+            0.6, -0.6, -5.0,
 
             // Triangle 3 (Right)
-            -0.1, -0.1, -1.5,
-            0.7, -0.1, -1.5,
-            0.3, 0.9, -1.5,
+            -0.6, 0.6, -50.0,
+            -0.6, -0.6, -50.0,
+            0.6, -0.6, -5.0, 
 
         ];
 
@@ -214,14 +214,14 @@ fn main() {
             1.0, 0.0, 0.0, 0.5,
 
             // Triangle 2 (Middle)
-            0.0, 1.0, 0.0, 0.5,
-            0.0, 1.0, 0.0, 0.5,
-            0.0, 1.0, 0.0, 0.5,
+            0.0, 0.0, 1.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
 
             // Triangle 3 (Right)
-            0.0, 0.0, 1.0, 0.5,
-            0.0, 0.0, 1.0, 0.5,
-            0.0, 0.0, 1.0, 0.5,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            0.0, 0.0, 1.0, 1.0,
         ];
 
         let my_vao = unsafe { create_vao(&vertices, &indices, &colors) };
@@ -253,6 +253,7 @@ fn main() {
         let mut camera_pos: glm::Vec3 = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
         let mut camera_rot: glm::Vec2 = glm::vec2(0.0, 0.0); // Rotation on x and z
         let camera_speed: f32 = 3.0; 
+        let pitch_cap: f32 = 90.0_f32.to_radians();
 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
@@ -271,8 +272,8 @@ fn main() {
 
         let transformation: glm::Mat4 = projection * translation;
 
-        println!("{}", transformation);
-        println!("{}", window_aspect_ratio);
+        // println!("{}", transformation);
+        // println!("{}", window_aspect_ratio);
 
         loop {
             
@@ -303,6 +304,7 @@ fn main() {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
                         // We can use sine and cosine to compute the direction of movement based on the camera rotation
+                        // This can also be done with matrix multiplication, but I prefer it this way
                         VirtualKeyCode::W => {
                             camera_pos[0] += camera_rot[1].sin() * camera_speed * delta_time;
                             camera_pos[2] -= camera_rot[1].cos() * camera_speed * delta_time;
@@ -330,9 +332,11 @@ fn main() {
                         // No camera speed multiplier because it was way too quick
                         VirtualKeyCode::Up => {
                             camera_rot[0] -= delta_time;
+                            camera_rot[0] = camera_rot[0].clamp(-pitch_cap, pitch_cap);
                         }
                         VirtualKeyCode::Down => {
                             camera_rot[0] += delta_time;
+                            camera_rot[0] = camera_rot[0].clamp(-pitch_cap, pitch_cap);
                         }
                         VirtualKeyCode::Left => {
                             camera_rot[1] -= delta_time;
