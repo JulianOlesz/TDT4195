@@ -184,19 +184,19 @@ fn main() {
             // Bottom-right vertice
             // Top vertice
             // Triangle 1 (Left)
-            -0.5, -0.5, 0.5,
-            0.3, -0.5, 0.5,
-            -0.1, 0.5, 0.5,
+            -0.5, -0.5, -2.5,
+            0.3, -0.5, -2.5,
+            -0.1, 0.5, -2.5,
 
             // Triangle 2 (Middle)
-            -0.3, -0.3, 0.0,
-            0.5, -0.3, 0.0,
-            0.1, 0.7, 0.0,
+            -0.3, -0.3, -2.0,
+            0.5, -0.3, -2.0,
+            0.1, 0.7, -2.0,
 
             // Triangle 3 (Right)
-            -0.1, -0.1, -0.5,
-            0.7, -0.1, -0.5,
-            0.3, 0.9, -0.5,
+            -0.1, -0.1, -1.5,
+            0.7, -0.1, -1.5,
+            0.3, 0.9, -1.5,
 
         ];
 
@@ -250,8 +250,8 @@ fn main() {
         let mut _arbitrary_number = 0.0; // feel free to remove
 
         // Variables for camera 
-        let mut camera_pos = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
-        let mut camera_rot = glm::vec2(0.0, 0.0); // Rotation on x and z
+        let mut camera_pos: glm::Vec3 = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
+        let mut camera_rot: glm::Vec2 = glm::vec2(0.0, 0.0); // Rotation on x and z
         let camera_speed: f32 = 3.0; 
 
         // The main rendering loop
@@ -302,17 +302,23 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
+                        // We can use sine and cosine to compute the direction of movement based on the camera rotation
                         VirtualKeyCode::W => {
-                            camera_pos[2] -= camera_speed * delta_time;
+                            camera_pos[0] += camera_rot[1].sin() * camera_speed * delta_time;
+                            camera_pos[2] -= camera_rot[1].cos() * camera_speed * delta_time;
+                            
                         }
                         VirtualKeyCode::A => {
-                            camera_pos[0] -= camera_speed * delta_time;
+                            camera_pos[0] -= camera_rot[1].cos() * camera_speed * delta_time;
+                            camera_pos[2] -= camera_rot[1].sin() * camera_speed * delta_time;
                         }
                         VirtualKeyCode::S => {
-                            camera_pos[2] += camera_speed * delta_time;
+                            camera_pos[0] -= camera_rot[1].sin() * camera_speed * delta_time;
+                            camera_pos[2] += camera_rot[1].cos() * camera_speed * delta_time;
                         }
                         VirtualKeyCode::D => {
-                            camera_pos[0] += camera_speed * delta_time;
+                            camera_pos[0] += camera_rot[1].cos() * camera_speed * delta_time;
+                            camera_pos[2] += camera_rot[1].sin() * camera_speed * delta_time;
                         }
                         VirtualKeyCode::LShift => {
                             camera_pos[1] -= camera_speed * delta_time;
