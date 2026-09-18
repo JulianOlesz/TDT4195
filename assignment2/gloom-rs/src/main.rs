@@ -306,8 +306,12 @@ fn main() {
                         // We can use sine and cosine to compute the direction of movement based on the camera rotation
                         // This can also be done with matrix multiplication, but I prefer it this way
                         VirtualKeyCode::W => {
-                            camera_pos[0] += camera_rot[1].sin() * camera_speed * delta_time;
-                            camera_pos[2] -= camera_rot[1].cos() * camera_speed * delta_time;
+                            let forward = glm::vec3(
+                                camera_rot[1].sin() * camera_rot[0].cos(),
+                                -camera_rot[0].sin(),
+                                -camera_rot[1].cos() * camera_rot[0].cos()
+                            );
+                            camera_pos += forward * camera_speed * delta_time;
                             
                         }
                         VirtualKeyCode::A => {
@@ -315,8 +319,12 @@ fn main() {
                             camera_pos[2] -= camera_rot[1].sin() * camera_speed * delta_time;
                         }
                         VirtualKeyCode::S => {
-                            camera_pos[0] -= camera_rot[1].sin() * camera_speed * delta_time;
-                            camera_pos[2] += camera_rot[1].cos() * camera_speed * delta_time;
+                            let forward = glm::vec3(
+                                camera_rot[1].sin() * camera_rot[0].cos(),
+                                -camera_rot[0].sin(),
+                                -camera_rot[1].cos() * camera_rot[0].cos()
+                            );
+                            camera_pos -= forward * camera_speed * delta_time;
                         }
                         VirtualKeyCode::D => {
                             camera_pos[0] += camera_rot[1].cos() * camera_speed * delta_time;
@@ -360,12 +368,14 @@ fn main() {
 
             // == // Please compute camera transforms here (exercise 2 & 3)
 
-            let mut camera_transformation: glm::Mat4 = glm::identity();
-            camera_transformation = glm::rotate(&camera_transformation, camera_rot[0], &glm::vec3(1.0, 0.0, 0.0));
-            camera_transformation = glm::rotate(&camera_transformation, camera_rot[1], &glm::vec3(0.0, 1.0, 0.0));
-            camera_transformation = glm::translate(&camera_transformation, &glm::vec3(-camera_pos[0], -camera_pos[1], -camera_pos[2]));
+            let t = glm::translate(&glm::identity(), &-camera_pos);
+            let rx = glm::rotate(&glm::identity(), camera_rot[0], &glm::vec3(1.0, 0.0, 0.0));
+            let ry = glm::rotate(&glm::identity(), camera_rot[1], &glm::vec3(0.0, 1.0, 0.0));
 
-            let transformation_c = projection * camera_transformation;
+            let view_matrix = rx * ry * t;
+
+            let transformation_c = projection * view_matrix;
+
 
             println!("{}", transformation_c);
 
