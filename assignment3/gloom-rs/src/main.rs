@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::{mem, os::raw::c_void, ptr};
 
+mod mesh;
 mod shader;
 mod util;
 
@@ -58,10 +59,16 @@ fn offset<T>(n: u32) -> *const c_void {
 // ptr::null()
 
 // == // Generate your VAO here
-unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>) -> u32 {
+unsafe fn create_vao(
+    vertices: &Vec<f32>,
+    indices: &Vec<u32>,
+    colors: &Vec<f32>,
+    normals: &Vec<f32>,
+) -> u32 {
     let mut vao: u32 = 0;
     let mut vbo: u32 = 0;
     let mut vbo_color: u32 = 0;
+    let mut vbo_normals: u32 = 0;
     let mut index_buffer: u32 = 0;
 
     // 1. Generate and bind the VAO
@@ -95,6 +102,17 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>)
     gl::VertexAttribPointer(1, 4, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
     gl::EnableVertexAttribArray(1);
 
+    gl::GenBuffers(1, &mut vbo_normals);
+    gl::BindBuffer(gl::ARRAY_BUFFER, vbo_normals);
+    gl::BufferData(
+        gl::ARRAY_BUFFER,
+        byte_size_of_array(normals),
+        pointer_to_array(normals),
+        gl::STATIC_DRAW,
+    );
+    gl::VertexAttribPointer(2, 3, gl::FLOAT, gl::FALSE, 0, std::ptr::null());
+    gl::EnableVertexAttribArray(2);
+
     // 4. Generate IBO (Index Buffer) and upload index data
     gl::GenBuffers(1, &mut index_buffer);
     gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, index_buffer);
@@ -109,6 +127,8 @@ unsafe fn create_vao(vertices: &Vec<f32>, indices: &Vec<u32>, colors: &Vec<f32>)
 }
 
 fn main() {
+    let lunar_mesh = mesh::Terrain::load("resources/lunarsurface.obj");
+
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
     let wb = glutin::window::WindowBuilder::new()
@@ -150,7 +170,7 @@ fn main() {
             c
         };
 
-        let mut window_aspect_ratio = INITIAL_SCREEN_W as f32 / INITIAL_SCREEN_H as f32;
+        let window_aspect_ratio = INITIAL_SCREEN_W as f32 / INITIAL_SCREEN_H as f32;
 
         // Set up openGL
         unsafe {
@@ -178,53 +198,16 @@ fn main() {
 
         // == // Set up your VAO around here
 
-        let vertices: Vec<f32> = vec![
-            //  X,     Y,    Z
-            // Bottom-left vertice
-            // Bottom-right vertice
-            // Top vertice
-            // Triangle 1 (Left)
-            -0.5, -0.5, 2.5,
-            0.3, -0.5, 2.5,
-            -0.1, 0.5, 2.5,
 
-            // Triangle 2 (Middle)
-            0.6, 0.6, -5.0,
-            -0.6, 0.6, -50.0,
-            0.6, -0.6, -5.0,
 
-            // Triangle 3 (Right)
-            -0.6, 0.6, -50.0,
-            -0.6, -0.6, -50.0,
-            0.6, -0.6, -5.0, 
-
-        ];
-
-        let indices: Vec<u32> = vec![
-            0, 1, 2, // Center
-            3, 4, 5, // Top-Left
-            6, 7, 8, // Top-Right
-        ];
-
-        let colors: Vec<f32> = vec![
-            // Triangle 1 (Left) - RGBA
-            // Red, Green, Blue, Alpha
-            1.0, 0.0, 0.0, 0.5,
-            1.0, 0.0, 0.0, 0.5,
-            1.0, 0.0, 0.0, 0.5,
-
-            // Triangle 2 (Middle)
-            0.0, 0.0, 1.0, 1.0,
-            1.0, 0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0, 1.0,
-
-            // Triangle 3 (Right)
-            1.0, 0.0, 0.0, 1.0,
-            1.0, 0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0, 1.0,
-        ];
-
-        let my_vao = unsafe { create_vao(&vertices, &indices, &colors) };
+        let my_vao = unsafe {
+            create_vao(
+                &lunar_mesh.vertices,
+                &lunar_mesh.indices,
+                &lunar_mesh.colors,
+                &lunar_mesh.normals,
+            )
+        };
 
         // == // Set up your shaders here
 
@@ -246,49 +229,30 @@ fn main() {
             simple_shader.activate();
         }
 
-        // Used to demonstrate keyboard handling for exercise 2.
-        let mut _arbitrary_number = 0.0; // feel free to remove
-
-        // Variables for camera 
+        // Variables for camera
         let mut camera_pos: glm::Vec3 = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
         let mut camera_rot: glm::Vec2 = glm::vec2(0.0, 0.0); // Rotation on x and z
-        let camera_speed: f32 = 3.0; 
+        let camera_speed: f32 = 40.0;
         let pitch_cap: f32 = 90.0_f32.to_radians();
 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
         let mut previous_frame_time = first_frame_time;
 
-        
-        let translation: glm::Mat4 = glm::translation(&glm::vec3(0.0, 0.0, -5.0));
-
-        let projection: glm::Mat4 = 
-            glm::perspective(
-                window_aspect_ratio,
-                20.0_f32.to_radians(),
-                1.0,
-                100.0,
-            );
-
-        let transformation: glm::Mat4 = projection * translation;
-
-        // println!("{}", transformation);
-        // println!("{}", window_aspect_ratio);
+        let projection: glm::Mat4 =
+            glm::perspective(window_aspect_ratio, 20.0_f32.to_radians(), 1.0, 1000.0);
 
         loop {
-            
             // Compute time passed since the previous frame and since the start of the program
             let now = std::time::Instant::now();
             let elapsed = now.duration_since(first_frame_time).as_secs_f32();
             let delta_time = now.duration_since(previous_frame_time).as_secs_f32();
             previous_frame_time = now;
 
-
             // Handle resize events
             if let Ok(mut new_size) = window_size.lock() {
                 if new_size.2 {
                     context.resize(glutin::dpi::PhysicalSize::new(new_size.0, new_size.1));
-                    window_aspect_ratio = new_size.0 as f32 / new_size.1 as f32;
                     (*new_size).2 = false;
                     println!("Window was resized to {}x{}", new_size.0, new_size.1);
                     unsafe {
@@ -309,10 +273,9 @@ fn main() {
                             let forward = glm::vec3(
                                 camera_rot[1].sin() * camera_rot[0].cos(),
                                 -camera_rot[0].sin(),
-                                -camera_rot[1].cos() * camera_rot[0].cos()
+                                -camera_rot[1].cos() * camera_rot[0].cos(),
                             );
                             camera_pos += forward * camera_speed * delta_time;
-                            
                         }
                         VirtualKeyCode::A => {
                             camera_pos[0] -= camera_rot[1].cos() * camera_speed * delta_time;
@@ -322,7 +285,7 @@ fn main() {
                             let forward = glm::vec3(
                                 camera_rot[1].sin() * camera_rot[0].cos(),
                                 -camera_rot[0].sin(),
-                                -camera_rot[1].cos() * camera_rot[0].cos()
+                                -camera_rot[1].cos() * camera_rot[0].cos(),
                             );
                             camera_pos -= forward * camera_speed * delta_time;
                         }
@@ -376,13 +339,16 @@ fn main() {
 
             let transformation_c = projection * view_matrix;
 
-
             println!("{}", transformation_c);
 
             unsafe {
                 // Clear the color and depth buffers
-                gl::ClearColor(0.035, 0.046, 0.078, 1.0); // night sky
+                gl::ClearColor(0.035, 0.046, 0.078, 1.0);
                 gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+
+                let c_str = std::ffi::CString::new("time").unwrap();
+                let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
+                gl::Uniform1f(location, elapsed);
 
                 let c_str = std::ffi::CString::new("time").unwrap();
                 let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
@@ -391,20 +357,13 @@ fn main() {
                 // Passes the transformation matrix to the shader
                 let name = std::ffi::CString::new("transformation").unwrap();
                 let location2 = gl::GetUniformLocation(simple_shader.program_id, name.as_ptr());
-                gl::UniformMatrix4fv(
-                    location2,
-                    1,
-                    gl::FALSE,
-                    transformation_c.as_ptr(),
-                );
-
-
+                gl::UniformMatrix4fv(location2, 1, gl::FALSE, transformation_c.as_ptr());
 
                 // 4. Draw the circle VAO
                 gl::BindVertexArray(my_vao);
                 gl::DrawElements(
                     gl::TRIANGLES,
-                    indices.len() as i32,
+                    lunar_mesh.index_count,
                     gl::UNSIGNED_INT,
                     std::ptr::null(),
                 );
@@ -464,15 +423,15 @@ fn main() {
             // Keep track of currently pressed keys to send to the rendering thread
             Event::WindowEvent {
                 event:
-                WindowEvent::KeyboardInput {
-                    input:
-                    KeyboardInput {
-                        state: key_state,
-                        virtual_keycode: Some(keycode),
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: key_state,
+                                virtual_keycode: Some(keycode),
+                                ..
+                            },
                         ..
                     },
-                    ..
-                },
                 ..
             } => {
                 if let Ok(mut keys) = arc_pressed_keys.lock() {
