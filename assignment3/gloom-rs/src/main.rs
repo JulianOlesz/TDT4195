@@ -14,9 +14,12 @@ use std::{mem, os::raw::c_void, ptr};
 
 mod mesh;
 mod scene_graph;
-mod shader;
-mod util;
 use scene_graph::SceneNode;
+
+mod shader;
+mod toolbox;
+
+mod util;
 
 use glutin::event::{
     DeviceEvent,
@@ -26,6 +29,7 @@ use glutin::event::{
     WindowEvent,
 };
 use glutin::event_loop::ControlFlow;
+use crate::toolbox::simple_heading_animation;
 
 // initial window size
 const INITIAL_SCREEN_W: u32 = 800;
@@ -80,7 +84,7 @@ unsafe fn draw_scene(
     let rz = glm::rotate(&glm::identity(), node.rotation.z, &glm::vec3(0.0, 0.0, 1.0));
     let rotation_matrix = rz * ry * rx;
 
-    let translation_reference_point  = glm::translate(&glm::identity(), &reference_point);
+    let translation_reference_point = glm::translate(&glm::identity(), &reference_point);
 
     let translation_position = glm::translate(&glm::identity(), &node.position);
 
@@ -335,6 +339,7 @@ fn main() {
         terrain_node.add_child(&helicopter_root_node);
         root_node.add_child(&terrain_node);
 
+        // Uncomment to rotate the helicopter
         // helicopter_body_node.rotation.y = std::f32::consts::PI ;
         // == // Set up your shaders here
 
@@ -477,6 +482,23 @@ fn main() {
                 let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
                 gl::Uniform1f(location, elapsed);
 
+                let main_rotor_speed = 10.0;
+                let tail_rotor_speed = 25.0;
+
+                let heading = simple_heading_animation(elapsed);
+
+                helicopter_body_node.position.x = heading.x;
+                helicopter_body_node.position.y = 12.0;
+                helicopter_body_node.position.z = heading.z;
+
+                helicopter_body_node.rotation.x = heading.pitch;
+                helicopter_body_node.rotation.y = heading.yaw;
+                helicopter_body_node.rotation.z = heading.roll;
+
+
+                helicopter_main_rotor_node.rotation.y = elapsed * main_rotor_speed;
+                helicopter_tail_rotor_node.rotation.x = elapsed * tail_rotor_speed;
+
                 let identity_matrix = glm::identity();
                 draw_scene(
                     &root_node,
@@ -540,15 +562,15 @@ fn main() {
             // Keep track of currently pressed keys to send to the rendering thread
             Event::WindowEvent {
                 event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                state: key_state,
-                                virtual_keycode: Some(keycode),
-                                ..
-                            },
+                WindowEvent::KeyboardInput {
+                    input:
+                    KeyboardInput {
+                        state: key_state,
+                        virtual_keycode: Some(keycode),
                         ..
                     },
+                    ..
+                },
                 ..
             } => {
                 if let Ok(mut keys) = arc_pressed_keys.lock() {
