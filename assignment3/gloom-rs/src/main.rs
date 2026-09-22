@@ -69,12 +69,34 @@ unsafe fn draw_scene(
     // Perform any logic needed before drawing the node
     // Check if node is drawable, if so: set uniforms, bind VAO and draw VAO
     // Recurse
+
+    let reference_point = node.reference_point;
+
+    let origin_reference_point = glm::translate(&glm::identity(), &-reference_point);
+    let scaling = glm::scale(&glm::identity(), &node.scale);
+
+    let rx = glm::rotate(&glm::identity(), node.rotation.x, &glm::vec3(1.0, 0.0, 0.0));
+    let ry = glm::rotate(&glm::identity(), node.rotation.y, &glm::vec3(0.0, 1.0, 0.0));
+    let rz = glm::rotate(&glm::identity(), node.rotation.z, &glm::vec3(0.0, 0.0, 1.0));
+    let rotation_matrix = rz * ry * rx;
+
+    let translation_reference_point  = glm::translate(&glm::identity(), &reference_point);
+
+    let translation_position = glm::translate(&glm::identity(), &node.position);
+
+    let node_matrix = translation_position * translation_reference_point * rotation_matrix * scaling * origin_reference_point;
+
+    let current_transformation = transformation_so_far * node_matrix;
+
+
     if node.index_count > 0 {
+        let mvp = view_projection_matrix * current_transformation;
+
         gl::UniformMatrix4fv(
             matrix_uniform_location,
             1,
             gl::FALSE,
-            view_projection_matrix.as_ptr(),
+            mvp.as_ptr(),
         );
 
         gl::BindVertexArray(node.vao_id);
@@ -90,7 +112,7 @@ unsafe fn draw_scene(
         draw_scene(
             &*child,
             view_projection_matrix,
-            transformation_so_far,
+            &current_transformation,
             matrix_uniform_location,
         );
     }
@@ -167,6 +189,7 @@ unsafe fn create_vao(
 fn main() {
     let lunar_mesh = mesh::Terrain::load("resources/lunarsurface.obj");
     let helicopter_mesh = mesh::Helicopter::load("resources/helicopter.obj");
+
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -282,6 +305,7 @@ fn main() {
             )
         };
 
+
         let mut root_node = SceneNode::new();
 
         let mut terrain_node = SceneNode::from_vao(terrain_vao, lunar_mesh.index_count);
@@ -291,23 +315,27 @@ fn main() {
             SceneNode::from_vao(helicopter_body_vao, helicopter_mesh.body.index_count);
         let mut helicopter_door_node =
             SceneNode::from_vao(helicopter_door_vao, helicopter_mesh.door.index_count);
+        helicopter_door_node.reference_point = glm::vec3(-0.9, 0.0, 0.0);
         let mut helicopter_main_rotor_node = SceneNode::from_vao(
             helicopter_main_rotor_vao,
             helicopter_mesh.main_rotor.index_count,
         );
+        helicopter_main_rotor_node.reference_point = glm::vec3(0.0, 2.2, 0.0);
         let mut helicopter_tail_rotor_node = SceneNode::from_vao(
             helicopter_tail_rotor_vao,
             helicopter_mesh.tail_rotor.index_count,
         );
+        helicopter_tail_rotor_node.reference_point = glm::vec3(0.35, 2.3, 10.4);
 
         helicopter_root_node.add_child(&helicopter_body_node);
-        helicopter_root_node.add_child(&helicopter_door_node);
-        helicopter_root_node.add_child(&helicopter_main_rotor_node);
-        helicopter_root_node.add_child(&helicopter_tail_rotor_node);
+        helicopter_body_node.add_child(&helicopter_door_node);
+        helicopter_body_node.add_child(&helicopter_main_rotor_node);
+        helicopter_body_node.add_child(&helicopter_tail_rotor_node);
 
         terrain_node.add_child(&helicopter_root_node);
         root_node.add_child(&terrain_node);
 
+        // helicopter_body_node.rotation.y = std::f32::consts::PI ;
         // == // Set up your shaders here
 
         // Basic usage of shader helper:
