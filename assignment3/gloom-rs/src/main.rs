@@ -485,6 +485,8 @@ fn main() {
                 let main_rotor_speed = 10.0;
                 let tail_rotor_speed = 25.0;
 
+                // Uncomment this line to stop the movement of the Helicopter
+                let elapsed = 0.0;
                 let heading = simple_heading_animation(elapsed);
 
                 helicopter_body_node.position.x = heading.x;
@@ -498,6 +500,9 @@ fn main() {
 
                 helicopter_main_rotor_node.rotation.y = elapsed * main_rotor_speed;
                 helicopter_tail_rotor_node.rotation.x = elapsed * tail_rotor_speed;
+
+                // Uncomment to Rotate the helicopter
+                // helicopter_root_node.rotation.y = std::f32::consts::PI;
 
                 let identity_matrix = glm::identity();
                 draw_scene(

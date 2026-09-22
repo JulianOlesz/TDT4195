@@ -15,4 +15,6 @@ void main() {
     vertexColor = color;
 
     vertexNormal = normal;
+    vertexNormal = normalize(mat3(transformation) * normal);
+
 }
