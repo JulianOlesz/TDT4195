@@ -13,8 +13,10 @@ use std::thread;
 use std::{mem, os::raw::c_void, ptr};
 
 mod mesh;
+mod scene_graph;
 mod shader;
 mod util;
+use scene_graph::SceneNode;
 
 use glutin::event::{
     DeviceEvent,
@@ -57,6 +59,42 @@ fn offset<T>(n: u32) -> *const c_void {
 
 // Get a null pointer (equivalent to an offset of 0)
 // ptr::null()
+
+unsafe fn draw_scene(
+    node: &scene_graph::SceneNode,
+    view_projection_matrix: &glm::Mat4,
+    transformation_so_far: &glm::Mat4,
+    matrix_uniform_location: i32,
+) {
+    // Perform any logic needed before drawing the node
+    // Check if node is drawable, if so: set uniforms, bind VAO and draw VAO
+    // Recurse
+    if node.index_count > 0 {
+        gl::UniformMatrix4fv(
+            matrix_uniform_location,
+            1,
+            gl::FALSE,
+            view_projection_matrix.as_ptr(),
+        );
+
+        gl::BindVertexArray(node.vao_id);
+        gl::DrawElements(
+            gl::TRIANGLES,
+            node.index_count,
+            gl::UNSIGNED_INT,
+            std::ptr::null(),
+        );
+    }
+
+    for &child in &node.children {
+        draw_scene(
+            &*child,
+            view_projection_matrix,
+            transformation_so_far,
+            matrix_uniform_location,
+        );
+    }
+}
 
 // == // Generate your VAO here
 unsafe fn create_vao(
@@ -128,6 +166,7 @@ unsafe fn create_vao(
 
 fn main() {
     let lunar_mesh = mesh::Terrain::load("resources/lunarsurface.obj");
+    let helicopter_mesh = mesh::Helicopter::load("resources/helicopter.obj");
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -198,9 +237,7 @@ fn main() {
 
         // == // Set up your VAO around here
 
-
-
-        let my_vao = unsafe {
+        let terrain_vao = unsafe {
             create_vao(
                 &lunar_mesh.vertices,
                 &lunar_mesh.indices,
@@ -208,6 +245,68 @@ fn main() {
                 &lunar_mesh.normals,
             )
         };
+
+        let helicopter_body_vao = unsafe {
+            create_vao(
+                &helicopter_mesh.body.vertices,
+                &helicopter_mesh.body.indices,
+                &helicopter_mesh.body.colors,
+                &helicopter_mesh.body.normals,
+            )
+        };
+
+        let helicopter_door_vao = unsafe {
+            create_vao(
+                &helicopter_mesh.door.vertices,
+                &helicopter_mesh.door.indices,
+                &helicopter_mesh.door.colors,
+                &helicopter_mesh.door.normals,
+            )
+        };
+
+        let helicopter_main_rotor_vao = unsafe {
+            create_vao(
+                &helicopter_mesh.main_rotor.vertices,
+                &helicopter_mesh.main_rotor.indices,
+                &helicopter_mesh.main_rotor.colors,
+                &helicopter_mesh.main_rotor.normals,
+            )
+        };
+
+        let helicopter_tail_rotor_vao = unsafe {
+            create_vao(
+                &helicopter_mesh.tail_rotor.vertices,
+                &helicopter_mesh.tail_rotor.indices,
+                &helicopter_mesh.tail_rotor.colors,
+                &helicopter_mesh.tail_rotor.normals,
+            )
+        };
+
+        let mut root_node = SceneNode::new();
+
+        let mut terrain_node = SceneNode::from_vao(terrain_vao, lunar_mesh.index_count);
+
+        let mut helicopter_root_node = SceneNode::new();
+        let mut helicopter_body_node =
+            SceneNode::from_vao(helicopter_body_vao, helicopter_mesh.body.index_count);
+        let mut helicopter_door_node =
+            SceneNode::from_vao(helicopter_door_vao, helicopter_mesh.door.index_count);
+        let mut helicopter_main_rotor_node = SceneNode::from_vao(
+            helicopter_main_rotor_vao,
+            helicopter_mesh.main_rotor.index_count,
+        );
+        let mut helicopter_tail_rotor_node = SceneNode::from_vao(
+            helicopter_tail_rotor_vao,
+            helicopter_mesh.tail_rotor.index_count,
+        );
+
+        helicopter_root_node.add_child(&helicopter_body_node);
+        helicopter_root_node.add_child(&helicopter_door_node);
+        helicopter_root_node.add_child(&helicopter_main_rotor_node);
+        helicopter_root_node.add_child(&helicopter_tail_rotor_node);
+
+        terrain_node.add_child(&helicopter_root_node);
+        root_node.add_child(&terrain_node);
 
         // == // Set up your shaders here
 
@@ -350,22 +449,12 @@ fn main() {
                 let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
                 gl::Uniform1f(location, elapsed);
 
-                let c_str = std::ffi::CString::new("time").unwrap();
-                let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
-                gl::Uniform1f(location, elapsed);
-
-                // Passes the transformation matrix to the shader
-                let name = std::ffi::CString::new("transformation").unwrap();
-                let location2 = gl::GetUniformLocation(simple_shader.program_id, name.as_ptr());
-                gl::UniformMatrix4fv(location2, 1, gl::FALSE, transformation_c.as_ptr());
-
-                // 4. Draw the circle VAO
-                gl::BindVertexArray(my_vao);
-                gl::DrawElements(
-                    gl::TRIANGLES,
-                    lunar_mesh.index_count,
-                    gl::UNSIGNED_INT,
-                    std::ptr::null(),
+                let identity_matrix = glm::identity();
+                draw_scene(
+                    &root_node,
+                    &transformation_c,
+                    &identity_matrix,
+                    simple_shader.get_uniform_location("transformation"),
                 );
             }
 
