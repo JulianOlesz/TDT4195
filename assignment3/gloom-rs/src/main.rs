@@ -314,29 +314,42 @@ fn main() {
 
         let mut terrain_node = SceneNode::from_vao(terrain_vao, lunar_mesh.index_count);
 
-        let mut helicopter_root_node = SceneNode::new();
-        let mut helicopter_body_node =
-            SceneNode::from_vao(helicopter_body_vao, helicopter_mesh.body.index_count);
-        let mut helicopter_door_node =
-            SceneNode::from_vao(helicopter_door_vao, helicopter_mesh.door.index_count);
-        helicopter_door_node.reference_point = glm::vec3(-0.9, 0.0, 0.0);
-        let mut helicopter_main_rotor_node = SceneNode::from_vao(
-            helicopter_main_rotor_vao,
-            helicopter_mesh.main_rotor.index_count,
-        );
-        helicopter_main_rotor_node.reference_point = glm::vec3(0.0, 2.2, 0.0);
-        let mut helicopter_tail_rotor_node = SceneNode::from_vao(
-            helicopter_tail_rotor_vao,
-            helicopter_mesh.tail_rotor.index_count,
-        );
-        helicopter_tail_rotor_node.reference_point = glm::vec3(0.35, 2.3, 10.4);
+        let mut helicopters: Vec<scene_graph::Node> = Vec::new();
 
-        helicopter_root_node.add_child(&helicopter_body_node);
-        helicopter_body_node.add_child(&helicopter_door_node);
-        helicopter_body_node.add_child(&helicopter_main_rotor_node);
-        helicopter_body_node.add_child(&helicopter_tail_rotor_node);
+        for i in 0..5 {
+            let mut helicopter_root_node = SceneNode::new();
+        
+            let mut helicopter_body_node =
+                SceneNode::from_vao(helicopter_body_vao, helicopter_mesh.body.index_count);
 
-        terrain_node.add_child(&helicopter_root_node);
+            let mut helicopter_door_node =
+                SceneNode::from_vao(helicopter_door_vao, helicopter_mesh.door.index_count);
+            helicopter_door_node.reference_point = glm::vec3(-0.9, 0.0, 0.0);
+
+            let mut helicopter_main_rotor_node = SceneNode::from_vao(
+                helicopter_main_rotor_vao,
+                helicopter_mesh.main_rotor.index_count,
+            );
+            helicopter_main_rotor_node.reference_point = glm::vec3(0.0, 2.2, 0.0);
+
+            let mut helicopter_tail_rotor_node = SceneNode::from_vao(
+                helicopter_tail_rotor_vao,
+                helicopter_mesh.tail_rotor.index_count,
+            );
+            helicopter_tail_rotor_node.reference_point = glm::vec3(0.35, 2.3, 10.4);
+
+            helicopter_body_node.add_child(&helicopter_door_node);
+            helicopter_body_node.add_child(&helicopter_main_rotor_node);
+            helicopter_body_node.add_child(&helicopter_tail_rotor_node);
+            helicopter_root_node.add_child(&helicopter_body_node);
+
+            helicopters.push(helicopter_root_node);
+        }
+
+        for helicopter in &helicopters {
+            terrain_node.add_child(helicopter);
+        }
+
         root_node.add_child(&terrain_node);
 
         // Uncomment to rotate the helicopter
@@ -486,23 +499,28 @@ fn main() {
                 let tail_rotor_speed = 25.0;
 
                 // Uncomment this line to stop the movement of the Helicopter
-                let elapsed = 0.0;
-                let heading = simple_heading_animation(elapsed);
+                //let elapsed = 0.0;
+                //let heading = simple_heading_animation(elapsed);
 
-                helicopter_body_node.position.x = heading.x;
-                helicopter_body_node.position.y = 12.0;
-                helicopter_body_node.position.z = heading.z;
+                for (i, helicopter) in helicopters.iter_mut().enumerate() {
+                    let offset = i as f32 * 0.8;
+                    let heading = simple_heading_animation(elapsed + offset);
 
-                helicopter_body_node.rotation.x = heading.pitch;
-                helicopter_body_node.rotation.y = heading.yaw;
-                helicopter_body_node.rotation.z = heading.roll;
+                    let body = helicopter.get_child(0);
+                    body.position.x = heading.x;
+                    body.position.y = 12.0;
+                    body.position.z = heading.z;
 
+                    body.rotation.x = heading.pitch;
+                    body.rotation.y = heading.yaw;
+                    body.rotation.z = heading.roll;
 
-                helicopter_main_rotor_node.rotation.y = elapsed * main_rotor_speed;
-                helicopter_tail_rotor_node.rotation.x = elapsed * tail_rotor_speed;
+                    let main_rotor = body.get_child(1);
+                    main_rotor.rotation.y = elapsed*main_rotor_speed;
 
-                // Uncomment to Rotate the helicopter
-                // helicopter_root_node.rotation.y = std::f32::consts::PI;
+                    let tail_rotor = body.get_child(2);
+                    tail_rotor.rotation.x = elapsed*tail_rotor_speed;
+                }
 
                 let identity_matrix = glm::identity();
                 draw_scene(
