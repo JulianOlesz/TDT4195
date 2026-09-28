@@ -21,6 +21,7 @@ mod toolbox;
 
 mod util;
 
+use crate::toolbox::simple_heading_animation;
 use glutin::event::{
     DeviceEvent,
     ElementState::{Pressed, Released},
@@ -29,7 +30,6 @@ use glutin::event::{
     WindowEvent,
 };
 use glutin::event_loop::ControlFlow;
-use crate::toolbox::simple_heading_animation;
 
 // initial window size
 const INITIAL_SCREEN_W: u32 = 800;
@@ -88,20 +88,18 @@ unsafe fn draw_scene(
 
     let translation_position = glm::translate(&glm::identity(), &node.position);
 
-    let node_matrix = translation_position * translation_reference_point * rotation_matrix * scaling * origin_reference_point;
+    let node_matrix = translation_position
+        * translation_reference_point
+        * rotation_matrix
+        * scaling
+        * origin_reference_point;
 
     let current_transformation = transformation_so_far * node_matrix;
-
 
     if node.index_count > 0 {
         let mvp = view_projection_matrix * current_transformation;
 
-        gl::UniformMatrix4fv(
-            matrix_uniform_location,
-            1,
-            gl::FALSE,
-            mvp.as_ptr(),
-        );
+        gl::UniformMatrix4fv(matrix_uniform_location, 1, gl::FALSE, mvp.as_ptr());
 
         gl::BindVertexArray(node.vao_id);
         gl::DrawElements(
@@ -193,7 +191,6 @@ unsafe fn create_vao(
 fn main() {
     let lunar_mesh = mesh::Terrain::load("resources/lunarsurface.obj");
     let helicopter_mesh = mesh::Helicopter::load("resources/helicopter.obj");
-
 
     // Set up the necessary objects to deal with windows and event handling
     let el = glutin::event_loop::EventLoop::new();
@@ -309,7 +306,6 @@ fn main() {
             )
         };
 
-
         let mut root_node = SceneNode::new();
 
         let mut terrain_node = SceneNode::from_vao(terrain_vao, lunar_mesh.index_count);
@@ -318,7 +314,7 @@ fn main() {
 
         for i in 0..5 {
             let mut helicopter_root_node = SceneNode::new();
-        
+
             let mut helicopter_body_node =
                 SceneNode::from_vao(helicopter_body_vao, helicopter_mesh.body.index_count);
 
@@ -377,15 +373,24 @@ fn main() {
         // Variables for camera
         let mut camera_pos: glm::Vec3 = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
         let mut camera_rot: glm::Vec2 = glm::vec2(0.0, 0.0); // Rotation on x and z
-        let camera_speed: f32 = 40.0;
+        let camera_speed: f32 = 400.0;
         let pitch_cap: f32 = 90.0_f32.to_radians();
+
+        // Variables for the controllable helicopter
+        let mut heli_pos: glm::Vec3 = glm::vec3(0.0, 12.0, 0.0);
+        let mut heli_yaw: f32 = 0.0;
+        let mut heli_pitch: f32 = 0.0;
+        let mut heli_roll: f32 = 0.0;
+
+        let heli_speed: f32 = 50.0;
+        let heli_turn_speed: f32 = 2.0;
 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
         let mut previous_frame_time = first_frame_time;
 
         let projection: glm::Mat4 =
-            glm::perspective(window_aspect_ratio, 20.0_f32.to_radians(), 1.0, 1000.0);
+            glm::perspective(window_aspect_ratio, 20.0_f32.to_radians(), 1.0, 10000.0);
 
         loop {
             // Compute time passed since the previous frame and since the start of the program
@@ -408,12 +413,41 @@ fn main() {
 
             // Handle keyboard input
             if let Ok(keys) = pressed_keys.lock() {
+
                 for key in keys.iter() {
+                    let forward = glm::vec3(
+                        -heli_yaw.sin(),
+                        0.0,
+                        -heli_yaw.cos(),
+                    );
+
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
                         // We can use sine and cosine to compute the direction of movement based on the camera rotation
                         // This can also be done with matrix multiplication, but I prefer it this way
+
+                        // Controlled Helicopter Steering
+                        // I -> Move Forward
+                        // K -> Moves Backwards
+                        // J -> Turn Left
+                        // L -> Turn Right
+                        VirtualKeyCode::I => {
+                            heli_pos += forward * heli_speed * delta_time;
+                            heli_pitch = -0.15;
+                        }
+                        VirtualKeyCode::K => {
+                            heli_pos -= forward * heli_speed * delta_time;
+                            heli_pitch = 0.15;
+                        }
+                        VirtualKeyCode::J => {
+                            heli_yaw -= heli_turn_speed * delta_time;
+                            heli_roll = -0.2;
+                        }
+                        VirtualKeyCode::L => {
+                            heli_yaw += heli_turn_speed * delta_time;
+                            heli_roll = 0.2;
+                        }
                         VirtualKeyCode::W => {
                             let forward = glm::vec3(
                                 camera_rot[1].sin() * camera_rot[0].cos(),
@@ -495,6 +529,15 @@ fn main() {
                 let location = gl::GetUniformLocation(simple_shader.program_id, c_str.as_ptr());
                 gl::Uniform1f(location, elapsed);
 
+                // Comment this code if not using Phong Shading
+                let camera_pos_location = simple_shader.get_uniform_location("cameraPosition");
+                gl::Uniform3f(
+                    camera_pos_location,
+                    camera_pos.x,
+                    camera_pos.y,
+                    camera_pos.z,
+                );
+
                 let main_rotor_speed = 10.0;
                 let tail_rotor_speed = 25.0;
 
@@ -503,24 +546,36 @@ fn main() {
                 //let heading = simple_heading_animation(elapsed);
 
                 for (i, helicopter) in helicopters.iter_mut().enumerate() {
-                    let offset = i as f32 * 0.8;
-                    let heading = simple_heading_animation(elapsed + offset);
-
                     let body = helicopter.get_child(0);
-                    body.position.x = heading.x;
-                    body.position.y = 12.0;
-                    body.position.z = heading.z;
 
-                    body.rotation.x = heading.pitch;
-                    body.rotation.y = heading.yaw;
-                    body.rotation.z = heading.roll;
+                    // Controlled Helicopter
+                    if (i == 0) {
+                        body.position = heli_pos;
+
+                        body.rotation.x = heli_pitch;
+                        body.rotation.y = heli_yaw;
+                        body.rotation.z = heli_roll;
+                    } else {
+                        let offset = i as f32 * 0.8;
+                        let heading = simple_heading_animation(elapsed + offset);
+
+                        body.position.x = heading.x;
+                        body.position.y = 12.0;
+                        body.position.z = heading.z;
+
+                        body.rotation.x = heading.pitch;
+                        body.rotation.y = heading.yaw;
+                        body.rotation.z = heading.roll;
+                    }
 
                     let main_rotor = body.get_child(1);
-                    main_rotor.rotation.y = elapsed*main_rotor_speed;
+                    main_rotor.rotation.y = elapsed * main_rotor_speed;
 
                     let tail_rotor = body.get_child(2);
-                    tail_rotor.rotation.x = elapsed*tail_rotor_speed;
+                    tail_rotor.rotation.x = elapsed * tail_rotor_speed;
                 }
+
+
 
                 let identity_matrix = glm::identity();
                 draw_scene(
@@ -585,15 +640,15 @@ fn main() {
             // Keep track of currently pressed keys to send to the rendering thread
             Event::WindowEvent {
                 event:
-                WindowEvent::KeyboardInput {
-                    input:
-                    KeyboardInput {
-                        state: key_state,
-                        virtual_keycode: Some(keycode),
+                    WindowEvent::KeyboardInput {
+                        input:
+                            KeyboardInput {
+                                state: key_state,
+                                virtual_keycode: Some(keycode),
+                                ..
+                            },
                         ..
                     },
-                    ..
-                },
                 ..
             } => {
                 if let Ok(mut keys) = arc_pressed_keys.lock() {
