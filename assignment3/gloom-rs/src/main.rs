@@ -371,10 +371,16 @@ fn main() {
         }
 
         // Variables for camera
+        let mut chase_cam = false;
+        let mut c_not_pressed = false;
         let mut camera_pos: glm::Vec3 = glm::vec3(0.0, 0.0, 0.0); // Coordinates x, y, z
         let mut camera_rot: glm::Vec2 = glm::vec2(0.0, 0.0); // Rotation on x and z
-        let camera_speed: f32 = 400.0;
+        let camera_speed: f32 = 100.0;
         let pitch_cap: f32 = 90.0_f32.to_radians();
+
+        // Reusing chase cam logic for door opening
+        let mut door_open = false;
+        let mut e_not_pressed = false;
 
         // Variables for the controllable helicopter
         let mut heli_pos: glm::Vec3 = glm::vec3(0.0, 12.0, 0.0);
@@ -413,6 +419,21 @@ fn main() {
 
             // Handle keyboard input
             if let Ok(keys) = pressed_keys.lock() {
+                
+                // Toggle for chase camera, it has to be here because otherwise
+                // it registers as a lot of keypresses per second. 
+                let c_pressed = keys.contains(&VirtualKeyCode::C);
+                    if c_pressed && !c_not_pressed {
+                        chase_cam = !chase_cam;
+                    }
+                c_not_pressed = c_pressed;
+
+                // Door open/close
+                let e_pressed = keys.contains(&VirtualKeyCode::E);
+                    if e_pressed && !e_not_pressed {
+                        door_open = !door_open;
+                    }
+                e_not_pressed = e_pressed;
 
                 for key in keys.iter() {
                     let forward = glm::vec3(
@@ -424,14 +445,12 @@ fn main() {
                     match key {
                         // The `VirtualKeyCode` enum is defined here:
                         //    https://docs.rs/winit/0.25.0/winit/event/enum.VirtualKeyCode.html
-                        // We can use sine and cosine to compute the direction of movement based on the camera rotation
-                        // This can also be done with matrix multiplication, but I prefer it this way
-
                         // Controlled Helicopter Steering
                         // I -> Move Forward
                         // K -> Moves Backwards
                         // J -> Turn Left
                         // L -> Turn Right
+                    
                         VirtualKeyCode::I => {
                             heli_pos += forward * heli_speed * delta_time;
                             heli_pitch = -0.15;
@@ -441,13 +460,14 @@ fn main() {
                             heli_pitch = 0.15;
                         }
                         VirtualKeyCode::J => {
-                            heli_yaw -= heli_turn_speed * delta_time;
-                            heli_roll = -0.2;
-                        }
-                        VirtualKeyCode::L => {
                             heli_yaw += heli_turn_speed * delta_time;
                             heli_roll = 0.2;
                         }
+                        VirtualKeyCode::L => {
+                            heli_yaw -= heli_turn_speed * delta_time;
+                            heli_roll = -0.2;
+                        }
+
                         VirtualKeyCode::W => {
                             let forward = glm::vec3(
                                 camera_rot[1].sin() * camera_rot[0].cos(),
@@ -509,16 +529,34 @@ fn main() {
             }
 
             // == // Please compute camera transforms here (exercise 2 & 3)
+            let view_matrix = if chase_cam {
+                let cam_distance = 45.0;
+                let cam_height = 5.0;
 
-            let t = glm::translate(&glm::identity(), &-camera_pos);
-            let rx = glm::rotate(&glm::identity(), camera_rot[0], &glm::vec3(1.0, 0.0, 0.0));
-            let ry = glm::rotate(&glm::identity(), camera_rot[1], &glm::vec3(0.0, 1.0, 0.0));
+                let cam_offset = glm::vec3(
+                    cam_distance * heli_yaw.sin(),
+                    cam_height,
+                    cam_distance * heli_yaw.cos(),
+                );
 
-            let view_matrix = rx * ry * t;
+                let cam_pos = heli_pos + cam_offset;
+
+                glm::look_at(
+                    &cam_pos,
+                    &heli_pos,
+                    &glm::vec3(0.0, 1.0, 0.0),
+                )
+
+            } else {
+                let t = glm::translate(&glm::identity(), &-camera_pos);
+                let rx = glm::rotate(&glm::identity(), camera_rot[0], &glm::vec3(1.0, 0.0, 0.0));
+                let ry = glm::rotate(&glm::identity(), camera_rot[1], &glm::vec3(0.0, 1.0, 0.0));
+                rx * ry * t
+            };
 
             let transformation_c = projection * view_matrix;
 
-            println!("{}", transformation_c);
+           //println!("{}", transformation_c);
 
             unsafe {
                 // Clear the color and depth buffers
@@ -573,9 +611,29 @@ fn main() {
 
                     let tail_rotor = body.get_child(2);
                     tail_rotor.rotation.x = elapsed * tail_rotor_speed;
+
+                    let door = body.get_child(0);
+                    let door_open_z = 1.4;
+                    let door_closed_z = 0.0;
+                    let door_speed = 0.8;
+                    
+                    if (i == 0) {
+                        // if-checks so that the door doesn't drift away 
+                        if door_open {
+                            if door.position.z < door_open_z {
+                                door.position.z += door_speed * delta_time;
+                                door.position.z = door.position.z.min(door_open_z);
+                            }
+                        }
+                        else {
+                            if door.position.z > door_closed_z {
+                                door.position.z -= door_speed * delta_time;
+                                door.position.z = door.position.z.max(door_closed_z);
+                            }
+                        }
+                    }
+                    
                 }
-
-
 
                 let identity_matrix = glm::identity();
                 draw_scene(
