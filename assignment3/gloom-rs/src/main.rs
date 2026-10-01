@@ -310,8 +310,10 @@ fn main() {
 
         let mut terrain_node = SceneNode::from_vao(terrain_vao, lunar_mesh.index_count);
 
+        // Stores the helicopters
         let mut helicopters: Vec<scene_graph::Node> = Vec::new();
 
+        // Loop that creates five helicopters
         for i in 0..5 {
             let mut helicopter_root_node = SceneNode::new();
 
@@ -342,6 +344,7 @@ fn main() {
             helicopters.push(helicopter_root_node);
         }
 
+        // Adding the helicopters to the terrain 
         for helicopter in &helicopters {
             terrain_node.add_child(helicopter);
         }
@@ -529,10 +532,12 @@ fn main() {
             }
 
             // == // Please compute camera transforms here (exercise 2 & 3)
+            // View matrix changes based on whether the chase camera is enabled
             let view_matrix = if chase_cam {
                 let cam_distance = 45.0;
                 let cam_height = 5.0;
 
+                // sine and cosine because the we need to rotate with the helicopter 
                 let cam_offset = glm::vec3(
                     cam_distance * heli_yaw.sin(),
                     cam_height,
@@ -541,6 +546,8 @@ fn main() {
 
                 let cam_pos = heli_pos + cam_offset;
 
+                // This function returns a view matrix, it takes the camera and helicopter position
+                // and computes a matrix. The last vector defines which way is up, so Y here
                 glm::look_at(
                     &cam_pos,
                     &heli_pos,
@@ -583,10 +590,11 @@ fn main() {
                 //let elapsed = 0.0;
                 //let heading = simple_heading_animation(elapsed);
 
+                // We loop through the helicopter list 
                 for (i, helicopter) in helicopters.iter_mut().enumerate() {
                     let body = helicopter.get_child(0);
 
-                    // Controlled Helicopter
+                    // Controlled helicopter, its position isn't defined by the heading animation 
                     if (i == 0) {
                         body.position = heli_pos;
 
@@ -617,6 +625,7 @@ fn main() {
                     let door_closed_z = 0.0;
                     let door_speed = 0.8;
                     
+                    // Openable door, only for the controllable helicopter
                     if (i == 0) {
                         // if-checks so that the door doesn't drift away 
                         if door_open {
